@@ -1,0 +1,387 @@
+
+\section*{Code for Random Offspring ( 1+ Poisson(1)) Distribution and Random Mating Function}
+\begin{lstlisting}[language=Python]
+import numpy as np
+import random
+import matplotlib.pyplot as plt
+\end{lstlisting}
+\begin{lstlisting}[language=Python]
+class Person:
+    def __init__(self, gender):
+        self.gender = gender
+        self.mother = None
+        self.father = None
+        self.generation = None
+
+def create_first_generation():
+    M = Person("M")
+    F = Person("F")
+    M.mother = F.father = None
+    M.father = F.mother = None
+    M.generation = F.generation = 1
+    return [M, F]
+
+def mate_random(parent1, parent2, generation):
+    num_male_children = 1+ np.random.poisson(1)  #mean number of male children is 1
+    num_female_children = 1+ np.random.poisson(1)  # mean number of female children is 1
+    #print(num_male_children, num_female_children)
+
+    children = []
+    for _ in range(num_male_children):
+        male_child = Person("M")
+        male_child.mother = parent1
+        male_child.father = parent2
+        male_child.generation = generation
+        children.append(male_child)
+
+    for _ in range(num_female_children):
+        female_child = Person("F")
+        female_child.mother = parent1
+        female_child.father = parent2
+        female_child.generation = generation
+        children.append(female_child)
+
+    return children
+
+def create_next_generation_random(current_generation, generation_number):
+    next_generation = []
+    # Track individuals who have already mated
+    already_mated = []
+
+    # Shuffle the order of individuals in the current generation
+    random.shuffle(current_generation)
+
+    for parent1 in current_generation:
+        if parent1.gender == "F" and parent1 not in already_mated:
+
+            # Find a random male who hasn't mated yet
+            for parent2 in current_generation:
+                if parent2.gender == "M" and parent2 not in already_mated:
+                    children = mate_random(parent1, parent2, generation_number)
+                    next_generation.extend(children)
+                    # Mark both parents as already mated
+                    already_mated.append(parent1)
+                    already_mated.append(parent2)
+                    break  # Move to the next female once a male is found
+    return next_generation
+\end{lstlisting}
+\begin{lstlisting}[language=Python]
+
+
+\end{lstlisting}
+\begin{lstlisting}[language=Python]
+def find_common_ancestor(person1, person2):
+    def find_all_ancestors(person):
+        ancestors = []
+        current_generation = [person]
+
+        while current_generation:
+            next_generation = []
+            for ancestor in current_generation:
+                if ancestor and ancestor not in ancestors:  # Avoid duplicates
+                    ancestors.append(ancestor)
+                    next_generation.extend([ancestor.mother, ancestor.father])
+            current_generation = next_generation
+
+        return ancestors
+
+    # Find all ancestors for both individuals
+    #[person1's mother, person1's father, grandmother1, grandfather1, great-grandmother1, great-grandfather1]
+    ancestors1 = find_all_ancestors(person1)
+    ancestors2 = find_all_ancestors(person2)
+
+    # Find common ancestors
+    #ancestors1 = [grandmother1, grandfather1, great-grandmother1, great-grandfather1]
+    #ancestors2 = [grandmother1, grandfather2, great-grandmother1]
+    #common_ancestors = [grandmother1, great-grandmother1]
+    common_ancestors = [ancestor for ancestor in ancestors1 if ancestor in ancestors2]
+
+    # If there are common ancestors, find the earliest (lowest generation number)
+    if common_ancestors:
+        #common_ancestors = [grandmother1 (gen=3), great-grandmother1 (gen=2)] => answer should be 3
+        earliest_common_ancestor = max(common_ancestors, key=lambda x: x.generation)
+        return earliest_common_ancestor.generation  # Return generation of the earliest common ancestor
+    else:
+        return None  # No common ancestor found
+
+\end{lstlisting}
+\begin{lstlisting}[language=Python]
+def find_mfcommon_ancestor(person1, person2):
+    def find_ancestors(person, gender):
+        ancestors = []
+        while person:
+            if gender == "F":
+                person = person.mother
+            else:
+                person = person.father
+            if person:
+                ancestors.append(person)
+        return ancestors
+
+    female_ancestors1 = find_ancestors(person1, "F")
+    female_ancestors2 = find_ancestors(person2, "F")
+    male_ancestors1 = find_ancestors(person1, "M")
+    male_ancestors2 = find_ancestors(person2, "M")
+
+    common_female_ancestor = None
+    for i in range(min(len(female_ancestors1), len(female_ancestors2))):
+        if female_ancestors1[i] == female_ancestors2[i]:
+            common_female_ancestor = female_ancestors1[i]
+            break
+
+    common_male_ancestor = None
+    for ancestor in male_ancestors1:
+        if ancestor in male_ancestors2:
+            common_male_ancestor = ancestor
+            break
+
+    return common_female_ancestor, common_male_ancestor
+\end{lstlisting}
+\begin{lstlisting}[language=Python]
+
+\end{lstlisting}
+\begin{lstlisting}[language=Python]
+common_ancestorgenall = []
+male_ancestorgenall = []
+female_ancestorgenall = []
+for k in range(10000):
+    if k %10 == 0:
+        print(k)
+
+    common_ancestor_generations = []
+    generations = []
+    current_generation = create_first_generation()
+    generations.append(current_generation)
+
+    common_female_generations = []
+    common_male_generations = []
+
+
+    for i in range(2, 11):
+        next_generation = create_next_generation_random(current_generation, i)
+        generations.append(next_generation)
+        current_generation = next_generation
+
+    for _ in range(10000):
+        # Select two random individuals from the last generation
+        last_generation = generations[-1]
+        person1, person2 = random.sample(last_generation, 2)
+
+        # Find the generation of the earliest common ancestor
+        common_ancestor_generation = find_common_ancestor(person1, person2)
+
+        if common_ancestor_generation is not None:
+            common_ancestor_generations.append(common_ancestor_generation)
+
+        common_female_ancestor, common_male_ancestor = find_mfcommon_ancestor(person1, person2)
+
+        if common_female_ancestor is not None:
+            common_female_generations.append(common_female_ancestor.generation)
+
+        # Store the generation number for common male ancestor
+        if common_male_ancestor is not None:
+            common_male_generations.append(common_male_ancestor.generation)
+
+
+    common_ancestorgenall.append(common_ancestor_generations)
+    male_ancestorgenall.append(common_male_generations)
+    female_ancestorgenall.append(common_female_generations)
+
+
+
+\end{lstlisting}
+\begin{lstlisting}[language=Python]
+np.unique(common_ancestorgenall, return_counts = True)
+\end{lstlisting}
+\begin{lstlisting}[language=Python]
+np.unique(male_ancestorgenall, return_counts = True)
+\end{lstlisting}
+\begin{lstlisting}[language=Python]
+np.unique(female_ancestorgenall, return_counts = True)
+\end{lstlisting}
+
+
+\section*{Code for Deterministic Offspring (2 Male, 2 Female) Distribution and Random Mating Function}
+\begin{lstlisting}[language=Python]
+import numpy as np
+import random
+import matplotlib.pyplot as plt
+\end{lstlisting}
+\begin{lstlisting}[language=Python]
+class Person:
+    def __init__(self, gender):
+        self.gender = gender
+        self.mother = None
+        self.father = None
+        self.generation = None
+
+def create_first_generation():
+    M = Person("M")
+    F = Person("F")
+    M.mother = F.father = None
+    M.father = F.mother = None
+    M.generation = F.generation = 1
+    return [M, F]
+
+def mate(parent1, parent2, generation):
+    child1 = Person("M")
+    child2 = Person("F")
+    child3 = Person("M")
+    child4 = Person("F")
+    child1.mother = child2.mother = child3.mother = child4.mother = parent1
+    child1.father = child2.father = child3.father = child4.father= parent2
+    child1.generation = child2.generation = child3.generation = child4.generation = generation
+    return child1, child2, child3, child4
+
+def create_next_generation(current_generation, generation_number):
+    next_generation = []
+    # Track individuals who have already mated
+    already_mated = []
+
+    # Shuffle the order of individuals in the current generation
+    random.shuffle(current_generation)
+
+    for parent1 in current_generation:
+        if parent1.gender == "F" and parent1 not in already_mated:
+
+            # Find a random male who hasn't mated yet
+            for parent2 in current_generation:
+                if parent2.gender == "M" and parent2 not in already_mated:
+                    child1, child2, child3, child4 = mate(parent1, parent2, generation_number)
+                    next_generation.extend([child1, child2, child3, child4])
+                    # Mark both parents as already mated
+                    already_mated.append(parent1)
+                    already_mated.append(parent2)
+                    break  # Move to the next female once a male is found
+    return next_generation
+
+
+\end{lstlisting}
+\begin{lstlisting}[language=Python]
+def find_common_ancestor(person1, person2):
+    def find_all_ancestors(person):
+        ancestors = []
+        current_generation = [person]
+
+        while current_generation:
+            next_generation = []
+            for ancestor in current_generation:
+                if ancestor and ancestor not in ancestors:  # Avoid duplicates
+                    ancestors.append(ancestor)
+                    next_generation.extend([ancestor.mother, ancestor.father])
+            current_generation = next_generation
+
+        return ancestors
+
+    # Find all ancestors for both individuals
+    #[person1's mother, person1's father, grandmother1, grandfather1, great-grandmother1, great-grandfather1]
+    ancestors1 = find_all_ancestors(person1)
+    ancestors2 = find_all_ancestors(person2)
+
+    # Find common ancestors
+    #ancestors1 = [grandmother1, grandfather1, great-grandmother1, great-grandfather1]
+    #ancestors2 = [grandmother1, grandfather2, great-grandmother1]
+    #common_ancestors = [grandmother1, great-grandmother1]
+    common_ancestors = [ancestor for ancestor in ancestors1 if ancestor in ancestors2]
+
+    # If there are common ancestors, find the earliest (lowest generation number)
+    if common_ancestors:
+        #common_ancestors = [grandmother1 (gen=3), great-grandmother1 (gen=2)] => answer should be 3
+        earliest_common_ancestor = max(common_ancestors, key=lambda x: x.generation)
+        return earliest_common_ancestor.generation  # Return generation of the earliest common ancestor
+    else:
+        return None  # No common ancestor found
+
+\end{lstlisting}
+\begin{lstlisting}[language=Python]
+def find_mfcommon_ancestor(person1, person2):
+    def find_ancestors(person, gender):
+        ancestors = []
+        while person:
+            if gender == "F":
+                person = person.mother
+            else:
+                person = person.father
+            if person:
+                ancestors.append(person)
+        return ancestors
+
+    female_ancestors1 = find_ancestors(person1, "F")
+    female_ancestors2 = find_ancestors(person2, "F")
+    male_ancestors1 = find_ancestors(person1, "M")
+    male_ancestors2 = find_ancestors(person2, "M")
+
+    common_female_ancestor = None
+    for i in range(min(len(female_ancestors1), len(female_ancestors2))):
+        if female_ancestors1[i] == female_ancestors2[i]:
+            common_female_ancestor = female_ancestors1[i]
+            break
+
+    common_male_ancestor = None
+    for ancestor in male_ancestors1:
+        if ancestor in male_ancestors2:
+            common_male_ancestor = ancestor
+            break
+
+    return common_female_ancestor, common_male_ancestor
+\end{lstlisting}
+\begin{lstlisting}[language=Python]
+
+\end{lstlisting}
+\begin{lstlisting}[language=Python]
+common_ancestorgenall = []
+male_ancestorgenall = []
+female_ancestorgenall = []
+for k in range(1000):
+    if k %10 == 0:
+        print(k)
+
+    common_ancestor_generations = []
+    generations = []
+    current_generation = create_first_generation()
+    generations.append(current_generation)
+
+    common_female_generations = []
+    common_male_generations = []
+
+
+    for i in range(2, 11):
+        next_generation = create_next_generation(current_generation, i)
+        generations.append(next_generation)
+        current_generation = next_generation
+    for _ in range(1000):
+        # Select two random individuals from the last generation
+        last_generation = generations[-1]
+        person1, person2 = random.sample(last_generation, 2)
+
+        # Find the generation of the earliest common ancestor
+        common_ancestor_generation = find_common_ancestor(person1, person2)
+
+        if common_ancestor_generation is not None:
+            common_ancestor_generations.append(common_ancestor_generation)
+
+        common_female_ancestor, common_male_ancestor = find_mfcommon_ancestor(person1, person2)
+
+        if common_female_ancestor is not None:
+            common_female_generations.append(common_female_ancestor.generation)
+
+        # Store the generation number for common male ancestor
+        if common_male_ancestor is not None:
+            common_male_generations.append(common_male_ancestor.generation)
+            
+        common_ancestorgenall.append(common_ancestor_generation)
+        male_ancestorgenall.append(common_male_ancestor)
+        female_ancestorgenall.append(common_female_ancestor)
+
+
+
+\end{lstlisting}
+\begin{lstlisting}[language=Python]
+np.unique(common_ancestorgenall, return_counts = True)
+\end{lstlisting}
+\begin{lstlisting}[language=Python]
+np.unique(male_ancestorgenall, return_counts = True)
+\end{lstlisting}
+\begin{lstlisting}[language=Python]
+np.unique(female_ancestorgenall, return_counts = True)
+\end{lstlisting}
